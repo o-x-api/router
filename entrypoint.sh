@@ -13,6 +13,7 @@ export API_KEY_SECRET="${API_KEY_SECRET}"
 export STORAGE_ENCRYPTION_KEY="${STORAGE_ENCRYPTION_KEY}"
 export HOST="0.0.0.0"
 export OMNIROUTE_SERVER_HOST="0.0.0.0"
+export APP_LOG_TO_FILE="false"
 # ===========================================================
 
 echo "[$(date +'%T')] --- OmniRoute /app/data Yedekleme Başlatıldı ---"

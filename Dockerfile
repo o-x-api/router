@@ -6,6 +6,7 @@ ENV HOSTNAME=0.0.0.0
 ENV HOST=0.0.0.0
 ENV OMNIROUTE_SERVER_HOST=0.0.0.0
 ENV NODE_ENV=production
+ENV APP_LOG_TO_FILE=false
 ENV DATA_DIR=/app/data
 
 # Install backup and networking dependencies inside container
