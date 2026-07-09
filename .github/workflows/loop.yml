@@ -16,8 +16,11 @@ jobs:
       - name: Install Hugging Face CLI
         run: pip install huggingface_hub
 
-      - name: Create Data Directory
-        run: mkdir -p ${{ github.workspace }}/data
+      - name: Create Structure Directories
+        run: |
+          mkdir -p ${{ github.workspace }}/data
+          # Create the exact configuration folder OmniRoute looks for
+          mkdir -p ${{ github.workspace }}/config
 
       - name: Restore Data Layer from Hugging Face
         env:
@@ -40,20 +43,25 @@ jobs:
               print(f'[!] Dataset not found or empty ({e}). Starting fresh.')
           "
 
+      - name: Generate OmniRoute Configuration File
+        run: |
+          echo "[*] Injecting secrets into server.env structure..."
+          cat << EOF > ${{ github.workspace }}/config/server.env
+          INITIAL_PASSWORD="${{ secrets.INITIAL_PASSWORD }}"
+          JWT_SECRET="${{ secrets.JWT_SECRET }}"
+          API_KEY_SECRET="${{ secrets.API_KEY_SECRET }}"
+          STORAGE_ENCRYPTION_KEY="${{ secrets.STORAGE_ENCRYPTION_KEY }}"
+          PORT=20128
+          EOF
+
       - name: Spin up OmniRoute and Cloudflare Containers
         run: |
+          # We mount your data folder to /app/data and your secret file to root's home directory config target
           docker run -d \
             --name omniroute \
             --network host \
-            -e INITIAL_PASSWORD="${{ secrets.INITIAL_PASSWORD }}" \
-            -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            -e OMNI_JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            -e API_KEY_SECRET="${{ secrets.API_KEY_SECRET }}" \
-            -e OMNI_API_KEY_SECRET="${{ secrets.API_KEY_SECRET }}" \
-            -e STORAGE_ENCRYPTION_KEY="${{ secrets.STORAGE_ENCRYPTION_KEY }}" \
-            -e OMNI_STORAGE_ENCRYPTION_KEY="${{ secrets.STORAGE_ENCRYPTION_KEY }}" \
-            -e PORT=20128 \
             -v ${{ github.workspace }}/data:/app/data \
+            -v ${{ github.workspace }}/config/server.env:/root/.omniroute/server.env \
             diegosouzapw/omniroute:latest
 
           docker run -d \
@@ -66,7 +74,6 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_DATASET: "${{ secrets.HF_USER_NAME }}/${{ secrets.HF_DATASET_NAME }}"
-          # Fallback default value is 600 seconds (10 mins) if the secret isn't configured yet
           SYNC_DELAY_SEC: ${{ secrets.SYNC_DELY || '600' }}
         run: |
           echo "[*] Launching real-time background backup synchronization daemon..."
@@ -80,7 +87,6 @@ jobs:
           delay = int(os.getenv('SYNC_DELAY_SEC', 600))
           
           start_time = time.time()
-          # 5.5 hours = 19800 seconds max running time allocation
           max_duration = 19800 
           
           while (time.time() - start_time) < max_duration:
