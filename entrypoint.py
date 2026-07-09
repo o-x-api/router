@@ -36,7 +36,7 @@ def backup_to_hf():
         return
     print(f"[*] Committing state changes to HF Dataset: {HF_DATASET}...")
     try:
-        api.create_repo(repo_id=HF_DATASET, repo_type="dataset", exist_ok=True)
+        api.create_repo(repo_id=HF_DATASET, repo_type="dataset", exist_ok=True, private=True)
         api.upload_folder(
             folder_path=LOCAL_DATA_DIR,
             repo_id=HF_DATASET,
