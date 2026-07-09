@@ -1,4 +1,4 @@
-name: 24/7 OmniRoute Keep-Alive Loop
+name: 24/7 OmniRoute Docker Keep-Alive Loop
 
 on:
   repository_dispatch:
@@ -6,69 +6,137 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-container-service:
+  run-docker-routing-service:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: write
 
     steps:
       - name: Checkout Code Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python Environment
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-          cache: 'pip'
+      - name: Install Hugging Face CLI
+        run: pip install huggingface_hub
 
-      - name: Install Runtime Dependencies
-        run: |
-          pip install -r requirements.txt
+      - name: Create Data Directory
+        run: mkdir -p ${{ github.workspace }}/data
 
-      - name: Install Cloudflare Tunnel Client
-        run: |
-          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-          sudo dpkg -i cloudflared.deb
-          rm cloudflared.deb
-
-      - name: Make Script Executable
-        run: chmod +x entrypoint.py
-
-      - name: Run Automated Sync Environment
+      - name: Restore Data Layer from Hugging Face
         env:
-          # --- HUGGING FACE BACKUP VARS ---
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_DATASET_NAME: "${{ secrets.HF_USER_NAME }}/${{ secrets.HF_DATASET_NAME }}"
-          OMNIROUT_DATA_DIR: ${{ github.workspace }}/data
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
-          # --- OMNIROUT APP VARS (SECURED FROM REPO SECRETS) ---
-          INITIAL_PASSWORD: ${{ secrets.INITIAL_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          API_KEY_SECRET: ${{ secrets.API_KEY_SECRET }}
-          STORAGE_ENCRYPTION_KEY: ${{ secrets.STORAGE_ENCRYPTION_KEY }}
-          PORT: 20128
+          HF_DATASET: "${{ secrets.HF_USER_NAME }}/${{ secrets.HF_DATASET_NAME }}"
         run: |
-          mkdir -p $OMNIROUT_DATA_DIR
-          
-          # 1. Start the OmniRoute application via our sync wrapper in the background
-          python3 entrypoint.py &
-          APP_PID=$!
-          
-          # 2. Fire up the Cloudflare Tunnel linked to your secure token
-          cloudflared tunnel --no-autoupdate run --token "${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" &
-          TUNNEL_PID=$!
-          
-          # 3. Keep running for 5.5 hours before restarting the cycle
-          sleep 19800
-          
-          echo "[*] 5.5 Hours reached. Gracefully stopping to sync state..."
-          kill -15 $APP_PID
-          kill -15 $TUNNEL_PID
-          wait $APP_PID
+          echo "[*] Downloading existing data layers from Hugging Face..."
+          python3 -c "
+          from huggingface_hub import snapshot_download
+          import os
+          try:
+              snapshot_download(
+                  repo_id=os.getenv('HF_DATASET'),
+                  repo_type='dataset',
+                  local_dir='${{ github.workspace }}/data',
+                  token=os.getenv('HF_TOKEN')
+              )
+              print('[+] Data successfully restored.')
+          except Exception as e:
+              print(f'[!] Dataset not found or empty ({e}). Starting fresh.')
+          "
 
-          echo "[*] Triggering next cycle..."
+      - name: Spin up OmniRoute and Cloudflare Containers
+        run: |
+          docker run -d \
+            --name omniroute \
+            --network host \
+            -e INITIAL_PASSWORD="${{ secrets.INITIAL_PASSWORD }}" \
+            -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            -e API_KEY_SECRET="${{ secrets.API_KEY_SECRET }}" \
+            -e STORAGE_ENCRYPTION_KEY="${{ secrets.STORAGE_ENCRYPTION_KEY }}" \
+            -e PORT=20128 \
+            -v ${{ github.workspace }}/data:/app/data \
+            diegosouzapw/omniroute:latest
+
+          docker run -d \
+            --name cloudflared \
+            --network host \
+            cloudflare/cloudflared:latest \
+            tunnel run --token "${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}"
+
+      - name: Background Auto-Sync Loop (Custom Secret Delay)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_DATASET: "${{ secrets.HF_USER_NAME }}/${{ secrets.HF_DATASET_NAME }}"
+          # Fallback default value is 600 seconds (10 mins) if the secret isn't configured yet
+          SYNC_DELAY_SEC: ${{ secrets.SYNC_DELY || '600' }}
+        run: |
+          echo "[*] Launching real-time background backup synchronization daemon..."
+          echo "[*] Delay set to: $SYNC_DELAY_SEC seconds."
+          
+          python3 -c "
+          from huggingface_hub import HfApi
+          import os, time
+          api = HfApi(token=os.getenv('HF_TOKEN'))
+          repo = os.getenv('HF_DATASET')
+          delay = int(os.getenv('SYNC_DELAY_SEC', 600))
+          
+          start_time = time.time()
+          # 5.5 hours = 19800 seconds max running time allocation
+          max_duration = 19800 
+          
+          while (time.time() - start_time) < max_duration:
+              time.sleep(delay)
+              print(f'[*] Background Sync: Archiving current state changes upstream after {delay}s...')
+              try:
+                  api.create_repo(repo_id=repo, repo_type='dataset', exist_ok=True, private=True)
+                  api.upload_folder(
+                      folder_path='${{ github.workspace }}/data',
+                      repo_id=repo,
+                      repo_type='dataset',
+                      commit_message='OmniRoute automated background auto-sync snapshot'
+                  )
+                  print('[+] Background Sync: Successful.')
+              except Exception as e:
+                  print(f'[!] Background Sync Failed: {e}')
+          " &
+          SYNC_PID=$!
+          echo "SYNC_DAEMON_PID=$SYNC_PID" >> $GITHUB_ENV
+
+      - name: Keep Runner Alive & Wait for Lifecycle Limit
+        run: |
+          echo "[*] Production environments stable. Running core block for 5.5 hours..."
+          sleep 19800
+
+      - name: Gracefully Shut Down Containers
+        run: |
+          echo "[*] Stopping network listeners and collecting state snapshots..."
+          docker stop -t 40 omniroute
+          docker stop cloudflared
+          kill -9 ${{ env.SYNC_DAEMON_PID }} || true
+
+      - name: Final Backup Data State
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_DATASET: "${{ secrets.HF_USER_NAME }}/${{ secrets.HF_DATASET_NAME }}"
+        run: |
+          echo "[*] Archiving definitive structural dump parameters..."
+          python3 -c "
+          from huggingface_hub import HfApi
+          import os
+          api = HfApi(token=os.getenv('HF_TOKEN'))
+          repo = os.getenv('HF_DATASET')
+          try:
+              api.create_repo(repo_id=repo, repo_type='dataset', exist_ok=True, private=True)
+              api.upload_folder(
+                  folder_path='${{ github.workspace }}/data',
+                  repo_id=repo,
+                  repo_type='dataset',
+                  commit_message='Final OmniRoute cycle state backup'
+              )
+              print('[+] Definitive upstream backup sequence completed.')
+          except Exception as e:
+              print(f'[!] Final Sync Failure: {e}')
+          "
+
+      - name: Trigger Next Loop Execution Cycle
+        run: |
+          echo "[*] Dispatching worker event hook to sustain 24/7 lifecycle..."
           curl -X POST \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
