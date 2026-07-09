@@ -37,11 +37,18 @@ jobs:
 
       - name: Run Automated Sync Environment
         env:
+          # --- HUGGING FACE BACKUP VARS ---
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          # Dynamically stitches username and dataset name together for entrypoint.py
           HF_DATASET_NAME: "${{ secrets.HF_USER_NAME }}/${{ secrets.HF_DATASET_NAME }}"
           OMNIROUT_DATA_DIR: ${{ github.workspace }}/data
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+          # --- OMNIROUT APP VARS (SECURED FROM REPO SECRETS) ---
+          INITIAL_PASSWORD: ${{ secrets.INITIAL_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          API_KEY_SECRET: ${{ secrets.API_KEY_SECRET }}
+          STORAGE_ENCRYPTION_KEY: ${{ secrets.STORAGE_ENCRYPTION_KEY }}
+          PORT: 20128
         run: |
           mkdir -p $OMNIROUT_DATA_DIR
           
@@ -50,7 +57,6 @@ jobs:
           APP_PID=$!
           
           # 2. Fire up the Cloudflare Tunnel linked to your secure token
-          # Note: Change the port '3000' here if OmniRoute listens on a different internal port
           cloudflared tunnel --no-autoupdate run --token "${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" &
           TUNNEL_PID=$!
           
