@@ -8,19 +8,24 @@ export HF_HOME="/tmp/.cache/huggingface"
 
 # --- 🔐 CONFIG & ENCRYPTION KEYS SETUP ---
 mkdir -p ~/.omniroute
+mkdir -p /app/data
+
+# Ensure /app/data/server.env exists and link ~/.omniroute/server.env to it
+touch /app/data/server.env
+ln -sf /app/data/server.env ~/.omniroute/server.env
 
 if [[ -n "${JWT_SECRET:-}" ]]; then
-    echo "[GÜVENLİK] GitHub secrets found. Writing custom keys to ~/.omniroute/server.env..."
-    cat << EOF > ~/.omniroute/server.env
+    echo "[GÜVENLİK] GitHub secrets found. Writing custom keys to /app/data/server.env..."
+    cat << EOF > /app/data/server.env
 JWT_SECRET="${JWT_SECRET}"
 STORAGE_ENCRYPTION_KEY="${STORAGE_ENCRYPTION_KEY:-}"
 API_KEY_SECRET="${API_KEY_SECRET:-}"
 EOF
 else
     echo "[GÜVENLİK] GitHub secrets not set. Checking persistent storage..."
-    if [[ -f "/app/data/server.env" ]]; then
+    # Check if a valid JWT_SECRET exists in the persistent file
+    if grep -q "JWT_SECRET=" /app/data/server.env && [[ $(grep "JWT_SECRET=" /app/data/server.env | cut -d'=' -f2) != "" ]]; then
         echo "[GÜVENLİK] Loading existing keys from /app/data/server.env..."
-        cp /app/data/server.env ~/.omniroute/server.env
     else
         echo "[GÜVENLİK] Creating new keys..."
         JWT_SECRET_GEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
@@ -32,12 +37,11 @@ JWT_SECRET="${JWT_SECRET_GEN}"
 STORAGE_ENCRYPTION_KEY="${STORAGE_ENCRYPTION_KEY_GEN}"
 API_KEY_SECRET="${API_KEY_SECRET_GEN}"
 EOF
-        cp /app/data/server.env ~/.omniroute/server.env
     fi
 fi
 
 # Load environment keys from server.env to process environment
-echo "[GÜVENLİK] Sourcing ~/.omniroute/server.env..."
+echo "[GÜVENLİK] Sourcing /app/data/server.env..."
 while IFS='=' read -r key value; do
     if [[ ! -z "$key" && ! "$key" =~ ^# ]]; then
         # remove quotes and carriage returns
@@ -45,7 +49,7 @@ while IFS='=' read -r key value; do
         value=$(echo "$value" | tr -d '"\r' | xargs)
         export "$key=$value"
     fi
-done < ~/.omniroute/server.env
+done < /app/data/server.env
 
 export INITIAL_PASSWORD="${INITIAL_PASSWORD:-}"
 export HOST="0.0.0.0"
