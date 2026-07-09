@@ -3,12 +3,13 @@ import os
 import sys
 import signal
 import subprocess
+from pathlib import Path
 from huggingface_hub import HfApi, snapshot_download
 
 # Configuration from environment variables
 HF_TOKEN = os.getenv("HF_TOKEN")
 HF_DATASET = os.getenv("HF_DATASET_NAME", "username/omnirout-data")
-LOCAL_DATA_DIR = os.getenv("OMNIROUT_DATA_DIR", "/app/data")
+LOCAL_DATA_DIR = os.getenv("OMNIROUT_DATA_DIR", "./data")
 
 api = HfApi(token=HF_TOKEN)
 
@@ -36,6 +37,7 @@ def backup_to_hf():
         return
     print(f"[*] Committing state changes to HF Dataset: {HF_DATASET}...")
     try:
+        # Force the repository to be 100% private upon creation
         api.create_repo(repo_id=HF_DATASET, repo_type="dataset", exist_ok=True, private=True)
         api.upload_folder(
             folder_path=LOCAL_DATA_DIR,
@@ -60,11 +62,19 @@ if __name__ == "__main__":
     # 1. Pull dataset from Hugging Face before launching application
     restore_from_hf()
 
-    # 2. Boot the official pre-built image's actual launch sequence
-    print("[*] Launching underlying official OmniRoute production image...")
-    
-    # We hand over execution to the original OmniRoute entrypoint command
-    process = subprocess.Popen(["node", "standalone/server.js"], cwd="/app")
+    # 2. Prepare the OmniRoute application environment locally on the runner
+    app_dir = Path("./omniroute_app").resolve()
+    if not app_dir.exists():
+        print("[*] Cloning OmniRoute repository framework...")
+        subprocess.run(["git", "clone", "https://github.com/diegosouzapw/OmniRoute.git", str(app_dir)], check=True)
+        print("[*] Installing OmniRoute application dependencies (npm install)...")
+        subprocess.run(["npm", "install"], cwd=str(app_dir), check=True)
+        print("[*] Compiling application production assets...")
+        subprocess.run(["npm", "run", "build"], cwd=str(app_dir), check=True)
+
+    # 3. Boot the compiled production build
+    print("[*] Launching OmniRoute production server...")
+    process = subprocess.Popen(["npm", "start"], cwd=str(app_dir))
 
     # Monitor runtime execution status
     while process.poll() is None:
