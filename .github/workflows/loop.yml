@@ -19,7 +19,6 @@ jobs:
       - name: Create Structure Directories
         run: |
           mkdir -p ${{ github.workspace }}/data
-          # Create the exact configuration folder OmniRoute looks for
           mkdir -p ${{ github.workspace }}/config
 
       - name: Restore Data Layer from Hugging Face
@@ -52,11 +51,13 @@ jobs:
           API_KEY_SECRET="${{ secrets.API_KEY_SECRET }}"
           STORAGE_ENCRYPTION_KEY="${{ secrets.STORAGE_ENCRYPTION_KEY }}"
           PORT=20128
+          BASE_URL="${{ secrets.BASE_URL }}"
+          NEXT_PUBLIC_BASE_URL="${{ secrets.BASE_URL }}"
           EOF
 
       - name: Spin up OmniRoute and Cloudflare Containers
         run: |
-          # We mount your data folder to /app/data and your secret file to root's home directory config target
+          # Boot OmniRoute using the newly generated configuration mapping
           docker run -d \
             --name omniroute \
             --network host \
