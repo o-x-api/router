@@ -101,6 +101,10 @@ while IFS='=' read -r key value; do
     fi
 done < /app/data/server.env
 
+echo "[DEBUG] JWT_SECRET length: ${#JWT_SECRET}"
+echo "[DEBUG] STORAGE_ENCRYPTION_KEY length: ${#STORAGE_ENCRYPTION_KEY}"
+echo "[DEBUG] API_KEY_SECRET length: ${#API_KEY_SECRET}"
+
 export INITIAL_PASSWORD="${INITIAL_PASSWORD:-}"
 export HOST="0.0.0.0"
 export OMNIROUTE_SERVER_HOST="0.0.0.0"
