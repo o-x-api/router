@@ -6,11 +6,48 @@ export DB_DIR="/app/data"
 export REPO_ID="${HF_USER_NAME}/${HF_DATASET_NAME}"
 export HF_HOME="/tmp/.cache/huggingface"
 
-# --- 🔐 FORCE OMNIROUTE TO USE DOCKER ENV KEYS ---
-export INITIAL_PASSWORD="${INITIAL_PASSWORD}"
-export JWT_SECRET="${JWT_SECRET}"
-export API_KEY_SECRET="${API_KEY_SECRET}"
-export STORAGE_ENCRYPTION_KEY="${STORAGE_ENCRYPTION_KEY}"
+# --- 🔐 CONFIG & ENCRYPTION KEYS SETUP ---
+mkdir -p ~/.omniroute
+
+if [[ -n "${JWT_SECRET:-}" ]]; then
+    echo "[GÜVENLİK] GitHub secrets found. Writing custom keys to ~/.omniroute/server.env..."
+    cat << EOF > ~/.omniroute/server.env
+JWT_SECRET="${JWT_SECRET}"
+STORAGE_ENCRYPTION_KEY="${STORAGE_ENCRYPTION_KEY:-}"
+API_KEY_SECRET="${API_KEY_SECRET:-}"
+EOF
+else
+    echo "[GÜVENLİK] GitHub secrets not set. Checking persistent storage..."
+    if [[ -f "/app/data/server.env" ]]; then
+        echo "[GÜVENLİK] Loading existing keys from /app/data/server.env..."
+        cp /app/data/server.env ~/.omniroute/server.env
+    else
+        echo "[GÜVENLİK] Creating new keys..."
+        JWT_SECRET_GEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+        STORAGE_ENCRYPTION_KEY_GEN=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+        API_KEY_SECRET_GEN=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+        
+        cat << EOF > /app/data/server.env
+JWT_SECRET="${JWT_SECRET_GEN}"
+STORAGE_ENCRYPTION_KEY="${STORAGE_ENCRYPTION_KEY_GEN}"
+API_KEY_SECRET="${API_KEY_SECRET_GEN}"
+EOF
+        cp /app/data/server.env ~/.omniroute/server.env
+    fi
+fi
+
+# Load environment keys from server.env to process environment
+echo "[GÜVENLİK] Sourcing ~/.omniroute/server.env..."
+while IFS='=' read -r key value; do
+    if [[ ! -z "$key" && ! "$key" =~ ^# ]]; then
+        # remove quotes and carriage returns
+        key=$(echo "$key" | tr -d '"\r' | xargs)
+        value=$(echo "$value" | tr -d '"\r' | xargs)
+        export "$key=$value"
+    fi
+done < ~/.omniroute/server.env
+
+export INITIAL_PASSWORD="${INITIAL_PASSWORD:-}"
 export HOST="0.0.0.0"
 export OMNIROUTE_SERVER_HOST="0.0.0.0"
 export APP_LOG_TO_FILE="false"
