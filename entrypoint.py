@@ -72,9 +72,15 @@ if __name__ == "__main__":
         print("[*] Compiling application production assets...")
         subprocess.run(["npm", "run", "build"], cwd=str(app_dir), check=True)
 
-    # 3. Boot the compiled production build
+    # 3. Boot the compiled production build with mapped environment variables
     print("[*] Launching OmniRoute production server...")
-    process = subprocess.Popen(["npm", "start"], cwd=str(app_dir))
+    
+    # Inject current running machine environment strings explicitly into the Node sub-process
+    current_env = os.environ.copy()
+    current_env["PORT"] = "20128"
+    current_env["NODE_ENV"] = "production"
+    
+    process = subprocess.Popen(["npm", "start"], cwd=str(app_dir), env=current_env)
 
     # Monitor runtime execution status
     while process.poll() is None:
