@@ -3,14 +3,14 @@ name: 24/7 OmniRoute Keep-Alive Loop
 on:
   repository_dispatch:
     types: [loop_worker]
-  workflow_dispatch: # Allows you to manually click "Run" to kickstart the first execution
+  workflow_dispatch:
 
 jobs:
   run-container-service:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write  # Crucial: Gives the runner permission to call the next loop
+      actions: write
 
     steps:
       - name: Checkout Code Repository
@@ -26,34 +26,42 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Install Cloudflare Tunnel Client
+        run: |
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+          rm cloudflared.deb
+
       - name: Make Script Executable
         run: chmod +x entrypoint.py
 
       - name: Run Automated Sync Environment
         env:
-          # Pull keys securely from GitHub Repository Secrets
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_DATASET_NAME: ${{ secrets.HF_DATASET_NAME }}
+          # Dynamically stitches username and dataset name together for entrypoint.py
+          HF_DATASET_NAME: "${{ secrets.HF_USER_NAME }}/${{ secrets.HF_DATASET_NAME }}"
           OMNIROUT_DATA_DIR: ${{ github.workspace }}/data
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Create data target directory
           mkdir -p $OMNIROUT_DATA_DIR
           
-          # 1. Execute entrypoint directly on runner hardware (runs initial download + app start sequence)
-          # Note: To loop via GitHub Actions, we wrap execution directly using our Python pipeline agent
+          # 1. Start the OmniRoute application via our sync wrapper in the background
           python3 entrypoint.py &
-          PID=$!
+          APP_PID=$!
           
-          # 2. Simulate execution uptime (GitHub Actions runners have a strict 6-hour ceiling)
-          # We pause here for 5.5 hours, then trigger a clean shutdown cycle to persist changes
+          # 2. Fire up the Cloudflare Tunnel linked to your secure token
+          # Note: Change the port '3000' here if OmniRoute listens on a different internal port
+          cloudflared tunnel --no-autoupdate run --token "${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" &
+          TUNNEL_PID=$!
+          
+          # 3. Keep running for 5.5 hours before restarting the cycle
           sleep 19800
           
-          print "[*] 5.5 Hours reached. Gracefully stopping to sync state..."
-          kill -15 $PID
-          wait $PID
+          echo "[*] 5.5 Hours reached. Gracefully stopping to sync state..."
+          kill -15 $APP_PID
+          kill -15 $TUNNEL_PID
+          wait $APP_PID
 
-          # 3. Request GitHub API to provision a fresh, unthrottled environment block immediately
           echo "[*] Triggering next cycle..."
           curl -X POST \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
