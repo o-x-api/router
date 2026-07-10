@@ -120,6 +120,15 @@ echo "[DEBUG] Before startup STORAGE_ENCRYPTION_KEY MD5: $(grep '^STORAGE_ENCRYP
     grep -o '^[A-Za-z0-9_]*' /app/data/server.env || true
     echo "[DEBUG] After startup JWT_SECRET MD5: $(grep '^JWT_SECRET=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
     echo "[DEBUG] After startup STORAGE_ENCRYPTION_KEY MD5: $(grep '^STORAGE_ENCRYPTION_KEY=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
+    python3 -c "
+with open('/app/data/server.env') as f:
+    for line in f:
+        line = line.strip()
+        if not line or line.startswith('#'): continue
+        if '=' not in line: continue
+        k, v = line.split('=', 1)
+        print(f'[DEBUG] Key format check - {k}: starts_with_quote={v.startswith(\'\"\')} ends_with_quote={v.endswith(\'\"\')} len={len(v)}')
+"
 ) &
 
 export INITIAL_PASSWORD="${INITIAL_PASSWORD:-}"
