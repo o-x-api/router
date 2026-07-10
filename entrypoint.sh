@@ -112,6 +112,14 @@ grep -o '^[A-Za-z0-9_]*' /app/data/server.env || true
 echo "[DEBUG] Before startup JWT_SECRET MD5: $(grep '^JWT_SECRET=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
 echo "[DEBUG] Before startup STORAGE_ENCRYPTION_KEY MD5: $(grep '^STORAGE_ENCRYPTION_KEY=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
 
+# Node identity checks
+node -e "
+const os = require('os');
+console.log('[DEBUG] Node os.homedir():', os.homedir());
+console.log('[DEBUG] Node process.env.HOME:', process.env.HOME);
+console.log('[DEBUG] Node UID/GID:', process.getuid ? process.getuid() : 'N/A', '/', process.getgid ? process.getgid() : 'N/A');
+"
+
 # Monitor if server.env gets modified or rewritten by the server process
 (
     sleep 15
