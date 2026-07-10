@@ -109,6 +109,8 @@ echo "[DEBUG] API_KEY_SECRET length: ${#API_KEY_SECRET}"
 echo "[DEBUG] Before startup server.env MD5: $(md5sum /app/data/server.env | cut -d' ' -f1)"
 echo "[DEBUG] Before startup keys:"
 grep -o '^[A-Za-z0-9_]*' /app/data/server.env || true
+echo "[DEBUG] Before startup JWT_SECRET MD5: $(grep '^JWT_SECRET=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
+echo "[DEBUG] Before startup STORAGE_ENCRYPTION_KEY MD5: $(grep '^STORAGE_ENCRYPTION_KEY=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
 
 # Monitor if server.env gets modified or rewritten by the server process
 (
@@ -116,6 +118,8 @@ grep -o '^[A-Za-z0-9_]*' /app/data/server.env || true
     echo "[DEBUG] 15s after startup server.env MD5: $(md5sum /app/data/server.env | cut -d' ' -f1)"
     echo "[DEBUG] 15s after startup keys:"
     grep -o '^[A-Za-z0-9_]*' /app/data/server.env || true
+    echo "[DEBUG] After startup JWT_SECRET MD5: $(grep '^JWT_SECRET=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
+    echo "[DEBUG] After startup STORAGE_ENCRYPTION_KEY MD5: $(grep '^STORAGE_ENCRYPTION_KEY=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
 ) &
 
 export INITIAL_PASSWORD="${INITIAL_PASSWORD:-}"
