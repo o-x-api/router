@@ -70,6 +70,7 @@ if [[ -n "${JWT_SECRET:-}" ]]; then
 JWT_SECRET="${JWT_SECRET}"
 STORAGE_ENCRYPTION_KEY="${STORAGE_ENCRYPTION_KEY:-}"
 API_KEY_SECRET="${API_KEY_SECRET:-}"
+STORAGE_ENCRYPTION_KEY_VERSION="v1"
 EOF
 else
     echo "[GÜVENLİK] GitHub secrets not set. Checking persistent storage..."
@@ -86,6 +87,7 @@ else
 JWT_SECRET="${JWT_SECRET_GEN}"
 STORAGE_ENCRYPTION_KEY="${STORAGE_ENCRYPTION_KEY_GEN}"
 API_KEY_SECRET="${API_KEY_SECRET_GEN}"
+STORAGE_ENCRYPTION_KEY_VERSION="v1"
 EOF
     fi
 fi
@@ -101,52 +103,11 @@ while IFS='=' read -r key value; do
     fi
 done < /app/data/server.env
 
-echo "[DEBUG] JWT_SECRET length: ${#JWT_SECRET}"
-echo "[DEBUG] STORAGE_ENCRYPTION_KEY length: ${#STORAGE_ENCRYPTION_KEY}"
-echo "[DEBUG] API_KEY_SECRET length: ${#API_KEY_SECRET}"
-
-# Print MD5 and keys before startup
-echo "[DEBUG] Before startup server.env MD5: $(md5sum /app/data/server.env | cut -d' ' -f1)"
-echo "[DEBUG] Before startup keys:"
-grep -o '^[A-Za-z0-9_]*' /app/data/server.env || true
-echo "[DEBUG] Before startup JWT_SECRET MD5: $(grep '^JWT_SECRET=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
-echo "[DEBUG] Before startup STORAGE_ENCRYPTION_KEY MD5: $(grep '^STORAGE_ENCRYPTION_KEY=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
-
-# Node identity checks
-node -e "
-const os = require('os');
-console.log('[DEBUG] Node os.homedir():', os.homedir());
-console.log('[DEBUG] Node process.env.HOME:', process.env.HOME);
-console.log('[DEBUG] Node UID/GID:', process.getuid ? process.getuid() : 'N/A', '/', process.getgid ? process.getgid() : 'N/A');
-"
-
-# Monitor if server.env gets modified or rewritten by the server process
-(
-    sleep 15
-    echo "[DEBUG] 15s after startup server.env MD5: $(md5sum /app/data/server.env | cut -d' ' -f1)"
-    echo "[DEBUG] 15s after startup keys:"
-    grep -o '^[A-Za-z0-9_]*' /app/data/server.env || true
-    echo "[DEBUG] After startup JWT_SECRET MD5: $(grep '^JWT_SECRET=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
-    echo "[DEBUG] After startup STORAGE_ENCRYPTION_KEY MD5: $(grep '^STORAGE_ENCRYPTION_KEY=' /app/data/server.env | cut -d'=' -f2- | tr -d '"\r' | xargs | md5sum | cut -d' ' -f1)"
-    python3 -c '
-import os
-if os.path.exists("/app/data/server.env"):
-    with open("/app/data/server.env") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"): continue
-            if "=" not in line: continue
-            k, v = line.split("=", 1)
-            starts_q = v.startswith("\"") or v.startswith("\x27")
-            ends_q = v.endswith("\"") or v.endswith("\x27")
-            print(f"[DEBUG] Key format check - {k}: starts_with_quote={starts_q} ends_with_quote={ends_q} len={len(v)}")
-'
-) &
-
 export INITIAL_PASSWORD="${INITIAL_PASSWORD:-}"
 export HOST="0.0.0.0"
 export OMNIROUTE_SERVER_HOST="0.0.0.0"
 export APP_LOG_TO_FILE="false"
+export OMNIROUTE_BOOTSTRAPPED="false"
 # ===========================================================
 
 # 3. CommitScheduler (Live Background State Synchronization Loop)
