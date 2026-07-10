@@ -20,14 +20,13 @@ It uses a **Hugging Face Hub dataset** as a free, persistent storage engine to a
 
 ```
 ├── README.md                      # Deployment guide & overview
-└── router/                        # Deployment orchestrator package
-    ├── Dockerfile                 # Custom OmniRoute image with HF & network tools
-    ├── entrypoint.sh              # Entry point script (RESTORE -> START -> BACKUP SCHEDULER)
-    ├── keepalive.txt              # Keep-alive heartbeat file
-    ├── start.sh                   # Runner orchestrator (DOCKER BUILD -> RUN -> CF TUNNEL -> KEEP ALIVE)
-    ├── tunnel.py                  # Cloudflare Managed Tunnel initializer
-    └── .github/workflows/
-        └── run-omniroute.yml      # Cron workflow definition (Runs every 6 hours)
+├── Dockerfile                 # Custom OmniRoute image with HF & network tools
+├── entrypoint.sh              # Entry point script (RESTORE -> START -> BACKUP SCHEDULER)
+├── keepalive.txt              # Keep-alive heartbeat file
+├── start.sh                   # Runner orchestrator (DOCKER BUILD -> RUN -> CF TUNNEL -> KEEP ALIVE)
+├── tunnel.py                  # Cloudflare Managed Tunnel initializer
+└── .github/workflows/
+    └── run-omniroute.yml      # Cron workflow definition (Runs every 6 hours)
 ```
 
 ---
