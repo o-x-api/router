@@ -63,6 +63,8 @@ Create a new GitHub Repository and push this code. Then, go to **Settings -> Sec
 | `JWT_SECRET` | Secret key used to sign dashboard cookies | 64-character hex string (e.g., `openssl rand -hex 32`) |
 | `STORAGE_ENCRYPTION_KEY` | Key used to encrypt credentials in SQLite | 64-character hex string (e.g., `openssl rand -hex 32`) |
 | `API_KEY_SECRET` | Secret key used to sign locally-generated API keys | 64-character hex string (e.g., `openssl rand -hex 32`) |
+| `MODEL_TEST_TIMEOUT_MS` | (Optional) Limit for model testing connection checks in ms | `60000` (Defaults to 60s if not set) |
+
 
 ---
 

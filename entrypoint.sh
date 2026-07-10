@@ -135,6 +135,27 @@ while True:
     time.sleep(60)
 " &
 
+# Patch compiled model test timeout to support environment variable override
+PATCH_FILE="/app/.build/next/server/chunks/[root-of-the-server]__14rml26._.js"
+if [[ -f "$PATCH_FILE" ]]; then
+    echo "[GÜVENLİK] Patching model test timeout in $PATCH_FILE..."
+    node -e '
+const fs = require("fs");
+const file = "/app/.build/next/server/chunks/[root-of-the-server]__14rml26._.js";
+if (fs.existsSync(file)) {
+    let content = fs.readFileSync(file, "utf8");
+    if (content.includes("timeoutMs:2e4")) {
+        content = content.replace("timeoutMs:2e4", "timeoutMs:(Number(process.env.MODEL_TEST_TIMEOUT_MS)||2e4)");
+        fs.writeFileSync(file, content, "utf8");
+        console.log("✅ Successfully patched PER_MODEL_TIMEOUT_MS to support MODEL_TEST_TIMEOUT_MS.");
+    } else {
+        console.log("ℹ️ Target string timeoutMs:2e4 not found or already patched.");
+    }
+}
+'
+fi
+
 # 4. Boot OmniRoute Single-Instance Binary Runtime
 echo "[System] OmniRoute başlatılıyor (/app/data)..."
 node dev/run-standalone.mjs
+

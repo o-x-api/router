@@ -36,6 +36,7 @@ docker run -d --name omniroute-instance \
   -e JWT_SECRET="$JWT_SECRET" \
   -e BASE_URL="${BASE_URL:-}" \
   -e SYNC_DELY="${SYNC_DELY:-}" \
+  -e MODEL_TEST_TIMEOUT_MS="${MODEL_TEST_TIMEOUT_MS:-}" \
   custom-omniroute
 
 # Stream the container's logs to stdout so we can see the OmniRoute boot and sync log messages in GitHub Actions
