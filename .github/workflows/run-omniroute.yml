@@ -67,7 +67,7 @@ jobs:
           CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
           SYNC_DELY: ${{ secrets.SYNC_DELY }}
           APP_LOG_TO_FILE: 'false'
-          RUN_DURATION: 21300 # 5.56 hours in seconds
+          RUN_DURATION: 20700 # 5.45 hours in seconds
         run: |
           chmod +x start.sh
           ./start.sh
