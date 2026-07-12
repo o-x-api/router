@@ -84,5 +84,5 @@ When the GitHub Actions workflow runs:
 4. **Active Sync Scheduler:**
    * Spins up an automatic cron routine in the container background that pushes SQLite database snapshots to your Hugging Face dataset every 5 minutes.
 5. **Session Termination & Backup:**
-   * The Action loops for ~5 hours 55 minutes to maximize runner lifetime.
+   * The Action loops for ~5 hours 45 minutes to maximize runner lifetime.
    * On termination (or when receiving shutdown signals), a final snapshot backup is successfully synced to Hugging Face before stopping the container.

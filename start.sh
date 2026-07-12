@@ -52,8 +52,8 @@ python3 "$SCRIPT_DIR/tunnel.py" &
 TUNNEL_PID=$!
 
 # 5. Heartbeat loop to keep GitHub Action alive
-# GitHub Actions timeouts at 6 hours (21600 seconds). Default duration: 5 hours 55 minutes (21300 seconds).
-DURATION=${RUN_DURATION:-21300}
+# GitHub Actions timeouts at 6 hours (21600 seconds). Default duration: 5 hours 45 minutes (20700 seconds).
+DURATION=${RUN_DURATION:-20700}
 START_TIME=$(date +%s)
 END_TIME=$((START_TIME + DURATION))
 
